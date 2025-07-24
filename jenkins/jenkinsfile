@@ -1,20 +1,43 @@
 pipeline {
     agent any
+
     stages {
-        stage('Build') {
+        stage('Checkout Code') {
             steps {
-                echo 'Building...'
+                git url: 'https://github.com/Saidhanekula31/jenkins-etl', branch: 'main'
             }
         }
-        stage('Test') {
+
+        stage('Archive Files') {
             steps {
-                echo 'Testing...'
+                // Archive all files into a single zip
+                sh 'zip -r artifact.zip *'
             }
         }
-        stage('Deploy') {
+
+        stage('Upload to S3') {
             steps {
-                echo 'Deploying...'
+                step([
+                    $class: 'S3UploadPublisher',
+                    profileName: 'aws-s3-creds', // this should match the AWS credentials ID
+                    entries: [[
+                        bucket: 'your-s3-rawdatajenkins',
+                        sourceFile: 'artifact.zip',
+                        selectedRegion: 'us-east-2', // change region if needed
+                        noUploadOnFailure: true,
+                        flatten: true
+                    ]]
+                ])
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Files uploaded to S3 successfully."
+        }
+        failure {
+            echo "❌ Upload failed."
         }
     }
 }
