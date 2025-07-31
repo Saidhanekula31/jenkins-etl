@@ -1,0 +1,42 @@
+pipeline {
+    agent any
+
+    environment {
+        AWS_REGION = 'us-east-2'
+        BUCKET = 's3://rawdatajenkins/jen/'
+    }
+
+    stages {
+        stage('Clone Repo') {
+            steps {
+                git url: 'https://github.com/Saidhanekula31/jenkins-etl', branch: 'main'
+            }
+        }
+
+        stage('Install Python Dependencies') {
+            steps {
+                sh 'pip install -r requirements.txt'
+            }
+        }
+
+        stage('Run Transform Script') {
+            steps {
+                sh 'python scripts/transform_data.py'
+            }
+        }
+
+        stage('Upload to S3') {
+            steps {
+                sh 'bash aws/s3_upload.sh'
+            }
+        }
+
+        stage('Trigger Glue Job') {
+            steps {
+                sh '''
+                aws glue start-job-run --job-name my-glue-job
+                '''
+            }
+        }
+    }
+}
