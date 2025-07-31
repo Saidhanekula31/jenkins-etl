@@ -29,6 +29,6 @@ df = transaction_df.join(account_df, "account_id", "left") \
 df = df.filter(df.status == "posted")
 
 # Save as partitioned Parquet
-df.write.partitionBy("account_type").parquet("s3://fintech-etl-processed-bucket/transactions/", mode="overwrite")
+df.write.partitionBy("account_type").parquet("s3://rawdatajenkins/jen/transactions/", mode="overwrite")
 
 job.commit()
