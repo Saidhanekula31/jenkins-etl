@@ -21,7 +21,7 @@ pipeline {
 
         stage('Run Transform Script') {
             steps {
-                sh 'python scripts/transform_data.py'
+                sh 'glue/transform_raw.py'
             }
         }
 

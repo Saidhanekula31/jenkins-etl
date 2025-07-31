@@ -14,9 +14,9 @@ job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
 # Load CSVs
-customer_df = spark.read.option("header", "true").csv("s3://fintech-etl-raw-bucket/data/raw/customer.csv")
-account_df = spark.read.option("header", "true").csv("s3://fintech-etl-raw-bucket/data/raw/account.csv")
-transaction_df = spark.read.option("header", "true").csv("s3://fintech-etl-raw-bucket/data/raw/transaction.csv")
+customer_df = spark.read.option("header", "true").csv("s3://rawdatajenkins/jen/raw/customer.csv")
+account_df = spark.read.option("header", "true").csv("s3://rawdatajenkins/jen/raw/account.csv")
+transaction_df = spark.read.option("header", "true").csv("s3://rawdatajenkins/jen/raw/transaction.csv")
 
 # Clean & Join
 customer_df = customer_df.drop("email", "ssn_plain", "dob")
