@@ -1,33 +1,34 @@
-import pandas as pd
-import os
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
 
-# Input paths
-raw_path = "../data/raw"
-output_path = "../data/processed/cleaned_transactions.csv"
+# Boilerplate
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
 
-# Load data
-account_df = pd.read_csv(f"{raw_path}/account.csv")
-customer_df = pd.read_csv(f"{raw_path}/customer.csv")
-transaction_df = pd.read_csv(f"{raw_path}/transaction.csv")
+# Load CSVs
+customer_df = spark.read.option("header", "true").csv("s3://fintech-etl-raw-bucket/data/raw/customer.csv")
+account_df = spark.read.option("header", "true").csv("s3://fintech-etl-raw-bucket/data/raw/account.csv")
+transaction_df = spark.read.option("header", "true").csv("s3://fintech-etl-raw-bucket/data/raw/transaction.csv")
 
-# Remove PII from customer
-customer_cleaned = customer_df.drop(columns=["email", "ssn_plain", "dob"])
+# Clean & Join
+customer_df = customer_df.drop("email", "ssn_plain", "dob")
+df = transaction_df.join(account_df, "account_id", "left") \
+                   .join(customer_df, "customer_id", "left") \
+                   .withColumn("amount_dollars", (transaction_df.amount_cents / 100)) \
+                   .drop("amount_cents", "created_at", "updated_at")
 
-# Join: transaction -> account -> customer
-merged = transaction_df.merge(account_df, on="account_id", how="left") \
-                       .merge(customer_cleaned, on="customer_id", how="left")
+# Filter for posted transactions
+df = df.filter(df.status == "posted")
 
-# Convert amount_cents to dollars
-merged["amount_dollars"] = merged["amount_cents"] / 100.0
+# Save as partitioned Parquet
+df.write.partitionBy("account_type").parquet("s3://fintech-etl-processed-bucket/transactions/", mode="overwrite")
 
-# Filter only 'posted' transactions
-merged_cleaned = merged[merged["status"] == "posted"]
-
-# Drop unnecessary columns (handle possible name conflicts)
-columns_to_drop = [col for col in merged_cleaned.columns if "amount_cents" in col or "created_at" in col or "updated_at" in col or "status" in col]
-merged_cleaned = merged_cleaned.drop(columns=columns_to_drop)
-
-# Save output
-os.makedirs("../data/processed", exist_ok=True)
-merged_cleaned.to_csv(output_path, index=False)
-print(f"✅ Saved cleaned data to: {output_path}")
+job.commit()
